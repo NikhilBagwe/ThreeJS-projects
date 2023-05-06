@@ -1,0 +1,12 @@
+In 3js, always the x,y,z are at the center of our cube/object. Thus, we add/subtract half of our width/height to it, to get the edge point i.e top,left,etc.
+
+3js "THREE.Mesh" dosen't provides a "height" property by default.
+So we create a class named "Box" which inherits Mesh and has height prop so that we can reference height and change it.
+
+===> Collision detection logic:
+
+- Check at which point the bottom of the Box and top of the Ground intersect.
+- Get bottom of cube = console.log(cube.position.y - cube.height / 2)
+- Get top of ground = ground.position.y + ground.height / 2
+
+===> As we moved ground position 'y' below by '-2', then we have to update the original position of ground object as it gives error while collision detection.

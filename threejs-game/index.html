@@ -1,0 +1,327 @@
+<style>
+  body {
+    margin: 0;
+    background: #0c4a6e;
+  }
+</style>
+<body></body>
+
+<script
+  async
+  src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"
+></script>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+    }
+  }
+</script>
+
+<script type="module">
+  import * as THREE from "three"
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js"
+
+  const scene = new THREE.Scene()
+  const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  )
+  camera.position.set(4.61, 2.74, 8)
+
+  const renderer = new THREE.WebGLRenderer({
+    alpha: true, // turns background to white
+    antialias: true, // remove jaggedness around cubes and sharpens them
+  })
+  renderer.shadowMap.enabled = true // Enable shadow
+  renderer.setSize(window.innerWidth, window.innerHeight)
+  document.body.appendChild(renderer.domElement)
+
+  const controls = new OrbitControls(camera, renderer.domElement)
+
+  // Box
+  class Box extends THREE.Mesh {
+    constructor({
+      width,
+      height,
+      depth,
+      color = "#00ff00",
+      velocity = {
+        x: 0,
+        y: 0,
+        z: 0,
+      },
+      position = {
+        x: 0,
+        y: 0,
+        z: 0,
+      },
+      zAcceleration = false,
+    }) {
+      super(
+        new THREE.BoxGeometry(width, height, depth),
+        new THREE.MeshStandardMaterial({ color })
+      )
+
+      this.width = width
+      this.height = height
+      this.depth = depth
+
+      this.position.set(position.x, position.y, position.z)
+
+      this.right = this.position.x + this.width / 2
+      this.left = this.position.x - this.width / 2
+
+      this.bottom = this.position.y - this.height / 2
+      this.top = this.position.y + this.height / 2
+
+      this.front = this.position.z + this.depth / 2
+      this.back = this.position.z - this.depth / 2
+
+      // to move object at different directions & rates
+      this.velocity = velocity
+
+      this.gravity = -0.005
+
+      this.zAcceleration = zAcceleration
+    }
+
+    updateSides() {
+      this.right = this.position.x + this.width / 2
+      this.left = this.position.x - this.width / 2
+
+      this.bottom = this.position.y - this.height / 2
+      this.top = this.position.y + this.height / 2
+
+      this.front = this.position.z + this.depth / 2
+      this.back = this.position.z - this.depth / 2
+    }
+
+    // top and bottom values must be updated for every frame rendered
+    update(ground) {
+      this.updateSides()
+
+      if (this.zAcceleration) this.velocity.z += 0.0003 //Increase speed of enemy to make game difficult
+
+      this.position.x += this.velocity.x
+      this.position.z += this.velocity.z
+
+      this.applyGravity(ground)
+    }
+
+    applyGravity(ground) {
+      // Adding gravity to make sure we accelerate quicker and quicker with every frame of animation
+      this.velocity.y += this.gravity
+
+      // Completely Stop moving Box, once it hits the ground
+      // if (this.bottom <= ground.top) this.velocity.y = 0
+
+      // Add Bounce effect on collision detection
+      // if (this.bottom + this.velocity.y <= ground.top) {
+      //   this.velocity.y *= 0.8 // adding friction to reduce height on every jump of cube after collision
+      //   this.velocity.y = -this.velocity.y
+      // } else {
+      //   // make Box go upwards/downwards
+      //   this.position.y += this.velocity.y
+      // }
+      if (boxCollision({ box1: this, box2: ground })) {
+        // Add Bounce effect
+        const friction = 0.8 // To pull down the cube downwards faster on bouncing/jumping
+        this.velocity.y *= friction
+        this.velocity.y = -this.velocity.y
+      } else {
+        this.position.y += this.velocity.y
+      }
+    }
+  }
+
+  // Detect for collision on X, Y and Z axis i.e cube goes beyond the edges of ground *************
+  function boxCollision({ box1, box2 }) {
+    // When right side of cube goes beyond left side of ground and vice versa
+    const xCollision = box1.right >= box2.left && box1.left <= box2.right
+
+    const yCollision =
+      box1.bottom + box1.velocity.y <= box2.top && box1.top >= box2.bottom
+
+    // When back side of cube goes beyond front side of ground and vice versa
+    const zCollision = box1.front >= box2.back && box1.back <= box2.front
+
+    return xCollision && yCollision && zCollision
+  }
+
+  // Cube
+  // const geometry = new THREE.BoxGeometry(1, 1, 1)
+  // const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+  // const cube = new THREE.Mesh(geometry, material)
+  const cube = new Box({
+    width: 1,
+    height: 1,
+    depth: 1,
+    velocity: { x: 0, y: -0.01, z: 0 },
+  })
+  cube.castShadow = true
+  scene.add(cube)
+
+  // Ground
+  const ground = new Box({
+    width: 10,
+    height: 0.5,
+    depth: 50,
+    color: "#0369a1",
+    position: {
+      x: 0,
+      y: -2,
+      z: 0,
+    },
+  })
+  // const ground = new THREE.Mesh(   == Old way
+  //   new THREE.BoxGeometry(5, 0.5, 10),
+  //   new THREE.MeshStandardMaterial({ color: 0x0000ff })
+  // )
+  ground.receiveShadow = true
+  // ground.position.y = -2
+  scene.add(ground)
+
+  // Light
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.position.y = 3
+  light.position.z = 1
+  light.castShadow = true
+  scene.add(light)
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+
+  camera.position.z = 5
+
+  // Logic to Move the cube ==============================
+  const keys = {
+    a: { pressed: false },
+    d: { pressed: false },
+    w: { pressed: false },
+    s: { pressed: false },
+  }
+
+  window.addEventListener("keydown", (e) => {
+    switch (e.code) {
+      case "KeyA":
+        // cube.velocity.x = -0.01
+        keys.a.pressed = true
+        break
+      case "KeyD":
+        // cube.velocity.x = 0.01
+        keys.d.pressed = true
+        break
+      case "KeyS":
+        keys.s.pressed = true
+        break
+      case "KeyW":
+        keys.w.pressed = true
+        break
+      case "Space":
+        cube.velocity.y = 0.1
+        break
+    }
+  })
+
+  window.addEventListener("keyup", (e) => {
+    switch (e.code) {
+      case "KeyA":
+        keys.a.pressed = false
+        break
+      case "KeyD":
+        keys.d.pressed = false
+        break
+      case "KeyS":
+        keys.s.pressed = false
+        break
+      case "KeyW":
+        keys.w.pressed = false
+        break
+    }
+  })
+
+  // Adding Enemies ********************************************
+  // const enemy = new Box({
+  //   width: 1,
+  //   height: 1,
+  //   depth: 1,
+  //   position: { x: 0, y: 0, z: -4 },
+  //   velocity: { x: 0, y: 0, z: 0.005 }, // Move enemy to end of platform
+  //   color: "red",
+  //   zAcceleration: true,
+  // })
+  // enemy.castShadow = true
+  // scene.add(enemy)
+
+  const enemies = []
+
+  // Track no. of frames rendered
+  let frames = 0
+
+  let spawnRate = 200
+
+  // ===========================================================
+
+  function animate() {
+    const animationId = requestAnimationFrame(animate)
+    renderer.render(scene, camera)
+
+    // Cube movement  - Left and Right ==========================
+
+    // Keep velocity of cube to 0 at start of every new frame
+    cube.velocity.x = 0
+    cube.velocity.z = 0
+
+    // Made both x and z axis code independent to attain diagonal movement
+    if (keys.a.pressed) cube.velocity.x = -0.05
+    else if (keys.d.pressed) cube.velocity.x = 0.05
+
+    if (keys.w.pressed) cube.velocity.z = -0.05
+    else if (keys.s.pressed) cube.velocity.z = 0.05
+
+    // =========================================================
+
+    cube.update(ground)
+
+    enemies.forEach((enemy) => {
+      enemy.update(ground)
+      if (boxCollision({ box1: cube, box2: enemy })) {
+        cancelAnimationFrame(animationId)
+      }
+    })
+
+    // Add new enemy after 30 frames have rendered
+    if (frames % spawnRate === 0) {
+      // new enemy spawns 20 frames quicker than previous enemy
+      if (spawnRate > 20) spawnRate -= 20
+
+      const enemy = new Box({
+        width: 1,
+        height: 1,
+        depth: 1,
+        position: {
+          x: (Math.random() - 0.5) * 10,
+          y: 0,
+          z: -20,
+        },
+        velocity: { x: 0, y: 0, z: 0.005 }, // Move enemy to end of platform
+        color: "red",
+        zAcceleration: true,
+      })
+      enemy.castShadow = true
+      scene.add(enemy)
+
+      enemies.push(enemy)
+    }
+
+    frames++
+    // cube.position.y += -0.01 // Move the cube downwards
+    // cube.rotation.x += 0.01
+    // cube.rotation.y += 0.01
+  }
+  animate()
+</script>
